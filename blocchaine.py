@@ -116,11 +116,13 @@ class Acteur(Agent):
                         future = executor.submit(self.rechercher_hash, self.block_provisoire)
                         # display the results
                         nonce, hash_operation = future.result()
-                        display_message(self.aid.localname, "Nonce: " + str(nonce) + " Hash: " + str(hash_operation))
-
+                        
                     # Broadcast le hash trouvé
                     if hash_operation is not None:
                         self.broadcast_hash_trouve(nonce, hash_operation)
+                        self.ajouter_block(self.block_provisoire)
+                        display_message(self.aid.localname, str(self.block_chaine))
+                        self.block_provisoire = Block(0, [])
 
             # Un acteur a trouvé le hash du block
             if message.performative == ACLMessage.PROPOSE:
@@ -128,8 +130,6 @@ class Acteur(Agent):
                 mes = str(message.content)
                 nonce, hash_operation = mes.split(" ")
                 self.verifier_block(float(nonce), hash_operation)
-
-            # display_message(self.aid.localname, 'mes')
     
 
     def rechercher_hash(self, block):
@@ -157,16 +157,11 @@ class Acteur(Agent):
             display_message(self.aid.localname, "Le hash du block est valide")
             # Ajouter le block à la chaine
             self.ajouter_block(self.block_provisoire)
-            # Afficher la chaine
-            display_message(self.aid.localname, str(self.block_chaine))
-            # Créer un nouveau block provisoire
+            # re-initialiser le block provisoire
             self.block_provisoire = Block(0, [])
         else:
             display_message(self.aid.localname, "Le hash du block n'est pas valide")
-            # Rechercher un nouveau hash
-            nonce, hash_operation = self.rechercher_hash(self.block_provisoire)
-            # Diffuser le nouveau hash
-            self.broadcast_hash_trouve(nonce, hash_operation)
+            self.broadcast_transaction()
 
     def ajouter_block(self, new_block):
         self.block_chaine.ajouter_block(new_block)
