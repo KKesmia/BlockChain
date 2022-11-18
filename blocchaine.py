@@ -12,7 +12,7 @@ import concurrent.futures
 global global_stop
 global_stop = False
 
-
+ 
 class Transaction:
     def __init__(self, acteur_1=None, acteur_2=None, date=None, montant=None) :
         self.acteur_1 = acteur_1
