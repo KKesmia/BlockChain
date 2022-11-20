@@ -202,9 +202,4 @@ if __name__ == '__main__':
 
 
 
-"""
-if __name__ == "__main__":
-    actor = acteur(1)
-    bchaine = block_chaine(block(1, transactions=[transaction(actor, actor, "16/11/2022", 10000)]))
-    actor.block_chaine = bchaine
-    print(actor.rechercher_hash(bchaine.premier_block))"""
+
