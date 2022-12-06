@@ -1,7 +1,5 @@
 # pade start-runtime blocchaine.py 
-
 import hashlib
-from http.client import NETWORK_AUTHENTICATION_REQUIRED
 from pade.misc.utility import display_message, start_loop, call_later
 from pade.acl.messages import ACLMessage
 from pade.core.agent import Agent
@@ -10,7 +8,7 @@ import random, time
 import threading
 import concurrent.futures
 
- 
+
 class Transaction:
     def __init__(self, acteur_1=None, acteur_2=None, date=None, montant=None) :
         self.acteur_1 = acteur_1
@@ -108,7 +106,7 @@ class Acteur(Agent):
         while True:
             if self.status == "trading":
                 message = ACLMessage(ACLMessage.INFORM)
-                for act in list_aid_acteurs:
+                for act in self.list_aid_acteurs:
                     if self.aid.localname != act.name:
                         message.add_receiver(act)
                 # Generer une transaction   
@@ -124,7 +122,8 @@ class Acteur(Agent):
 
     def on_start(self):
         super(Acteur, self).on_start()
-        call_later(20, self.broadcast_transaction_)
+        display_message(self.aid.localname, "hey wtf!")
+        call_later(0, self.broadcast_transaction_)
 
     def broadcast_transaction_(self):
         Acteur.global_stop = False
@@ -144,7 +143,7 @@ class Acteur(Agent):
     
     def broadcast_hash_trouve(self, nonce , hash_operation):
         message = ACLMessage(ACLMessage.PROPOSE)
-        for act in list_aid_acteurs:
+        for act in self.list_aid_acteurs:
             if self.aid.localname != act.name:
                 message.add_receiver(act)
         message.set_content(str(nonce) +"#"+ str(hash_operation)+ "#"+ str(self.block_provisoire))
@@ -174,7 +173,7 @@ class Acteur(Agent):
             self.block_provisoire.sort()
             hash_operation = hashlib.sha256(
                 str(str(nonce**2) + str(block)).encode()).hexdigest()
-            if hash_operation[:6] == '000000':
+            if hash_operation[:5] == '00000':
                 check_proof = True
                 Acteur.global_stop = True
                 display_message(self.aid.localname, "J'ai trouve un hash.")
@@ -215,36 +214,68 @@ class Acteur(Agent):
     def __str__(self):
         return "Acteur_" + str(self.id)
 
+
+class Superviseur(Agent):
+    def __init__(self, aid, players=4):
+        super(Superviseur, self).__init__(aid=aid)
+        self.aid = aid
+        self.players = players
+        self.acteurs = self.kick_off()
+        self.agents = [self] + self.acteurs
+        self.list_aid_acteurs = [x.aid for x in self.acteurs]
+        
+
+    def kick_off(self):
+        list_aid_acteurs = list()
+        list_acteurs = list()
+
+        # Instancier les acteurs 
+        for i in range(self.players):
+            a = AID(name = 'agent_player_{}@localhost:{}'.format(1001+i, 1001+i))
+            list_acteurs.append(Acteur(a))
+            list_aid_acteurs.append(a)
+
+        # Donner les adresses des acteurs aux acteurs
+        for act in list_acteurs:
+            act.list_aid_acteurs = list_aid_acteurs
+
+        # Instancier le premier block
+        premier_block = Block(0)
+        # Chaque acteur se donne 100 à lui même 
+        liste_transactions = []
+        for act in list_acteurs :
+            liste_transactions.append(Transaction(self.aid, act.aid, time.strftime("%d/%m/%Y"), 100))
+        premier_block.transactions = liste_transactions
+        # Donner le premier block aux acteurs
+        for act in list_acteurs :
+            act.block_chaine.liste_blocks.append(premier_block)
+        
+        return list_acteurs
+
+    def on_start(self):
+        super(Superviseur, self).on_start()
+        call_later(10, self.broadcast_check())
+
+    def broadcast_check(self):
+        while True:
+            message = ACLMessage(ACLMessage.INFORM)
+            for act in self.list_aid_acteurs:
+                message.add_receiver(act)
+            message.set_content("check")
+            self.send(message)
+            time.sleep(5)
+
+    def react(self, message):
+        super(Superviseur, self).react(message)
+        if message.sender.name in [i.name for i in self.list_aid_acteurs]:
+            pass
+
+
 if __name__ == '__main__':
-    compte_acteur = 10
-    list_acteurs = list()
-    list_aid_acteurs = list()
+    Game_name = 'agent_superviseur@localhost:{}'.format(1000)
+    Agent_superviseur = Superviseur(AID(name = Game_name), 3)
+    start_loop(Agent_superviseur.agents)
 
-    # Instancier les acteurs 
-    for i in range(compte_acteur):
-        a = AID(name = 'agent_player_{}@localhost:{}'.format(1000+i, 1000+i))
-        list_acteurs.append(Acteur(a))
-        list_aid_acteurs.append(a)
-
-    # Donner les adresses des acteurs aux acteurs
-    for act in list_acteurs:
-        act.list_aid_acteurs = list_aid_acteurs
-
-    # Instancier le premier block
-    premier_block = Block(0)
-    # Chaque acteur se donne 100 à lui même 
-    liste_transactions = []
-    for act in list_acteurs :
-        liste_transactions.append(Transaction(act.aid, act.aid, time.strftime("%d/%m/%Y"), 100))
-
-    premier_block.transactions = liste_transactions
-
-    # Donner le premier block aux acteurs
-    for act in list_acteurs :
-        act.block_chaine.liste_blocks.append(premier_block)
-
-    # Lancer les acteurs
-    start_loop(list_acteurs)
 
 
 
