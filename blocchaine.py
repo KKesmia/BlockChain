@@ -45,7 +45,27 @@ class Block:
         for i in self.sort():
             ret = ret + "\n" + str(i)
         return ret
-    
+
+    def update_block(self, block):
+        transactions_a_jour = list()
+        self.sort()
+        block.sort()
+        for i_tr, j_tr in zip(self.transactions, block.transactions):
+            if str(i_tr) != str(j_tr):
+                transactions_a_jour.append(i_tr)
+
+
+    def from_str(self, input):
+        self.transactions = list()
+        string_transactions = input.split("\n")
+        for str_tr in string_transactions:
+            try:
+                tr = Transaction()
+                self.transactions.append(tr.from_str(str_tr))
+            except:
+                pass
+
+
     def sort(self):
         # Sort the transactions by acteur_1
         self.transactions = sorted(self.transactions, key=lambda transaction: transaction.acteur_1.name)
@@ -76,11 +96,8 @@ class Acteur(Agent):
         # Adresse du premier block
         self.block_chaine = Block_chaine()
     
-    def on_start(self):
-        super(Acteur, self).on_start()
-        call_later(10, self.broadcast_transaction)
+    def echanger(self):
 
-    def broadcast_transaction(self):
         message = ACLMessage(ACLMessage.INFORM)
         for act in list_aid_acteurs:
             if self.aid.localname != act.name:
@@ -91,14 +108,41 @@ class Acteur(Agent):
         # Ajouter sa propre transaction au block provisoire car les agents ne réagissent pas à leurs propres messages
         self.block_provisoire.transactions.append(tr)
         self.send(message)
+
+    def check(self):
+        while True:
+            message = ACLMessage(ACLMessage.AGREE)
+            for act in list_aid_acteurs:
+                if self.aid.localname != act.name:
+                    message.add_receiver(act)
+            message.set_content("")
+            self.send(message)
+            time.sleep(3)
+
+
+    def on_start(self):
+        super(Acteur, self).on_start()
+        # Pour s assurer que tous le monde reste connecté sur Pade
+        if("1000" in self.aid.getName()):
+            thread = threading.Thread(target=self.check)
+            thread.start()
+        call_later(10, self.broadcast_transaction_)
+
+
+    def broadcast_transaction_(self):
+        display_message(self.aid.localname, "J'envoie des transactions")
+        Acteur.global_stop = False
+        self.echanger()
+
     
     def broadcast_hash_trouve(self, nonce , hash_operation):
         message = ACLMessage(ACLMessage.PROPOSE)
         for act in list_aid_acteurs:
             if self.aid.localname != act.name:
                 message.add_receiver(act)
-        message.set_content(str(nonce) +" "+ str(hash_operation))
+        message.set_content(str(nonce) +"#"+ str(hash_operation)+ "#"+ str(self.block_provisoire))
         self.send(message)
+    
 
     def react(self, message):
         super(Acteur, self).react(message)
@@ -108,28 +152,23 @@ class Acteur(Agent):
                 tr = Transaction().from_str(mes)
                 self.block_provisoire.transactions.append(tr)
                 if len(self.block_provisoire.transactions) == len(self.list_aid_acteurs):
-                    # display_message(self.aid.localname, str(self.block_provisoire))
-                    # Order les transactions 
-                    self.block_provisoire.sort()
-                    # Calculer le hash du block dans un thread séparé
                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                         future = executor.submit(self.rechercher_hash, self.block_provisoire)
-                        # display the results
-                        nonce, hash_operation = future.result()
-                        
+                    # display the results
+                    nonce, hash_operation = future.result()
+        
                     # Broadcast le hash trouvé
                     if hash_operation is not None:
                         self.broadcast_hash_trouve(nonce, hash_operation)
-                        self.ajouter_block(self.block_provisoire)
-                        display_message(self.aid.localname, str(self.block_chaine))
-                        self.block_provisoire = Block(0, [])
-
+                        # implementation de verification de block
+                        self.verifier_block(float(nonce), hash_operation, finder=True)
+                        
             # Un acteur a trouvé le hash du block
             if message.performative == ACLMessage.PROPOSE:
-
+                self.status = "checking"
                 mes = str(message.content)
-                nonce, hash_operation = mes.split(" ")
-                self.verifier_block(float(nonce), hash_operation)
+                nonce, hash_operation, str_transactions = mes.split("#")
+                self.verifier_block(float(nonce), hash_operation, str_transactions)
     
 
     def rechercher_hash(self, block):
@@ -151,17 +190,31 @@ class Acteur(Agent):
             hash_operation = None
         return nonce, hash_operation  
 
-    def verifier_block(self, nonce, hash_operation):
+    def verifier_block(self, nonce, hash_operation, str_transactions=None, finder=False):
+
+        if finder == True:
+            # Dans le cas ou celui qui a trouvé le bon hash verifie la liste des transactions qui n est pas encore implementé
+            # donc on suppose que c est tous le temps correct
+            self.ajouter_block(self.block_provisoire )
+            self.block_provisoire = Block(0, [])
+            self.broadcast_transaction_()
+            return 
+
         # Vérifier que le hash du block est valide
-        if hashlib.sha256(str(str(nonce**2) + str(self.block_provisoire)).encode()).hexdigest() == hash_operation:
+        proposed_block = Block(id=0)
+        proposed_block.from_str(str_transactions)
+        proposed_block.sort()
+        
+        if hashlib.sha256(str(str(nonce**2) + str(proposed_block)).encode()).hexdigest() == hash_operation:
             display_message(self.aid.localname, "Le hash du block est valide")
             # Ajouter le block à la chaine
-            self.ajouter_block(self.block_provisoire)
+            self.ajouter_block(proposed_block)
             # re-initialiser le block provisoire
             self.block_provisoire = Block(0, [])
         else:
-            display_message(self.aid.localname, "Le hash du block n'est pas valide")
-            self.broadcast_transaction()
+            display_message(self.aid.localname, "Le hash du block n'est pas valide, reprennons la recherche")
+        
+        self.broadcast_transaction_()
 
     def ajouter_block(self, new_block):
         self.block_chaine.ajouter_block(new_block)
