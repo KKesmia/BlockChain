@@ -1,4 +1,7 @@
-# pade start-runtime --port 20000 blocchaine.py 
+# pade start-runtime blocchaine.py 
+# Jinja2==3.0.3
+# itsdangerous==2.0.1
+# Werkzeug==2.0.3
 
 import hashlib
 from pade.misc.utility import display_message, start_loop, call_later
