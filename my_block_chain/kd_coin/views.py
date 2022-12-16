@@ -244,8 +244,8 @@ def rechercher_hash():
         #         else:
         #             nonce = random()
         while True :
-            # if len(block_courant) >=5 :
-                while le_hash[:5] != '00000' and len(block_courant) >=5 :
+            if len(block_courant) >=5 :
+                while le_hash[:6] != '000000' :
                     nonce = random()
                     le_hash = hashlib.sha256(
                             str(str(nonce**2) + str(block_courant)).encode()).hexdigest()
