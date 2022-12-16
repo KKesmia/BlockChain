@@ -212,6 +212,8 @@ def loop(request):
 
 def send_transactions():
     while True:
+        time.sleep(randint(1, 4))
+        
         print("J'envoie une transaction a " + str(sys.argv[-1]))
         # Generate random transaction
         tr = generate_transaction()
@@ -223,8 +225,7 @@ def send_transactions():
             except:
                 pass
         # sleep for a random time
-        time.sleep(randint(3, 5))
-
+        time.sleep(randint(1, 4))
 
 def rechercher_hash():
         nonce = random()
@@ -234,39 +235,15 @@ def rechercher_hash():
         global my_stop
         count = 0
         my_stop = False
-
-        # while  not global_stop:
-        #         # print("Je cherche un hash pour le block courant "+str(len(block_courant)))
-        #         le_hash = hashlib.sha256(
-        #             str(str(nonce**2) + str(block_courant)).encode()).hexdigest()
-        #         if le_hash[:5] == '00000':
-        #             global_stop = True
-        #             print("J'ai trouve le bon nonce " + str(sys.argv[-1]) )
-        #             broadcast_block(nonce , le_hash, block_courant)
-        #             # Reset le block courant
-        #             block_courant = Block(0 , [])
-        #             # Ajouter le block courant à la chaine
-
-        #             # Reset global_stop
-        #             global_stop = False
-        #         else:
-        #             nonce = random()
-        # return nonce, le_hash 
-
         while not my_stop:
             nonce = random()
             le_hash = hashlib.sha256(str(str(nonce**2) + str(block_courant)).encode()).hexdigest()
             count += 1
-            if le_hash[:5] == '00000':
+            if le_hash[:6] == '000000':
                 my_stop = True
                 print("J'ai trouve le bon nonce " + str(sys.argv[-1]) +" apres "+str(count)+" iterations")
+                print(block_courant)
                 broadcast_block(nonce , le_hash, block_courant)
-                # if str(sys.argv[-1]) == "8080" :
-                #     requests.get("http://127.0.0.1:8090/kd_coin/receive_nonce", json={'nonce':nonce , 'hash':le_hash , 'block':block_courant.json()})
-                #     print("------ envoyé    au 8090 ------")
-                # else :
-                #     requests.get("http://127.0.0.1:8080/kd_coin/receive_nonce", json={'nonce':nonce , 'hash':le_hash , 'block':block_courant.json()})
-                #     print("------ envoyé    au 8080 ------")
                 # Ajouter le block courant à la chaine
                 my_block_chaine.ajouter_block(block_courant)
                 print("Ma chaine est de taille "+str(len(my_block_chaine)))
@@ -274,7 +251,6 @@ def rechercher_hash():
                 block_courant = Block(0 , [])
                 # Reset les variables
                 count = 0
-
 
 # if __name__ != "__main__":
 #     print("hello")
