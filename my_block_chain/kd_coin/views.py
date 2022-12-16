@@ -1,11 +1,12 @@
 # python manage.py runserver 8080 
 
 from multiprocessing.resource_sharer import stop
+import os
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 import requests
 import time
-from random import random , randint
+from random import random , randint, choice
 import json
 import sys
 import threading
@@ -43,7 +44,11 @@ class Block:
         self.transactions = transactions
         self.block_suivant = None
         self.block_precedent = None
-     
+    
+    def reset(self):
+        self.id = 0
+        self.transactions = [Transaction("_", sys.argv[-1], datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 6)]
+
     def __str__(self):
         ret = ""
         for i in self.sort():
@@ -67,7 +72,28 @@ class Block:
 class Block_chaine:
     def __init__(self):
         self.liste_blocks = [] 
+        self.solde = dict()
         pass
+
+    def eval(self, block = None):
+        if block == None:
+            for tr in self.liste_blocks[0].transactions:
+                self.solde.setdefault(tr.acteur_1, tr.montant) 
+            print(self.solde.items())
+        else:
+            for tr in block.transactions:
+                try:
+                    sender = self.solde[tr.acteur_1]
+                except:
+                    self.solde.setdefault(tr.acteur_2, self.solde[tr.acteur_2] + tr.montant)
+                    continue
+                receiver = self.solde[tr.acteur_2]
+                if sender - tr.montant <= 0:
+                    return False
+                else:
+                    self.solde.setdefault(tr.acteur_1, sender - tr.montant)
+                    self.solde.setdefault(tr.acteur_2, receiver + tr.montant)
+        return True
 
     def ajouter_block(self, block):
         block.id = self.liste_blocks[-1].id + 1
@@ -84,29 +110,34 @@ class Block_chaine:
 # Init the variables
 
 clients = ['8080', '8090', '8100']
+clients_ = ['8080', '8090'] 
+clients_.remove(sys.argv[-1])
 liste_transactions = []
 global block_courant 
-block_courant = Block(0 , [])
+block_courant = Block(0, [])
+block_courant.reset()
 global my_block_chaine
 global my_stop
 my_block_chaine = Block_chaine()
 # Ajouter le premier block
 premier_block = Block(0 , [])
-for act in clients :
-        liste_transactions.append(Transaction(act, act, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 100))
+for act in clients[:2]:
+    liste_transactions.append(Transaction(act, act, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 100))
+premier_block.transactions = liste_transactions
 my_block_chaine.liste_blocks.append(premier_block)
-
+my_block_chaine.eval(None)
 
 def index(request):
     return JsonResponse({'foo':'bar'})
 
 def generate_transaction():
     # Generate random transaction
+    
     tr = {
-        'acteur_1': 'acteur_1',
-        'acteur_2': 'acteur_2',
+        'acteur_1': sys.argv[-1],
+        'acteur_2': choice(clients_),
         'date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'montant': randint(1,10)
+        'montant': randint(1, 10)
     }
     return tr
 
@@ -148,9 +179,6 @@ def receive_nonce(request):
     global my_block_chaine
     global my_stop
     my_stop = True # arreter le thread de recherche de nonce
-    # Reset le block courant pour arreter la recherche du hash
-    block_attente = block_courant
-    block_courant = Block(0 , [])
     print("Je recois un nonce " + str(sys.argv[-1]))
     
     # Get the data  from the GET request and cast it to a dict from json
@@ -167,7 +195,7 @@ def receive_nonce(request):
     print(block_a_tester)
 
     # Si le nonce est valide
-    if hashlib.sha256(str(str(response["nonce"]**2) + str(block_a_tester)).encode()).hexdigest() == response["hash"]:
+    if hashlib.sha256(str(str(response["nonce"]**2) + str(block_a_tester)).encode()).hexdigest() == response["hash"] and my_block_chaine.eval(block_a_tester):
         print("+++++++++++ Nonce valide")
         # Ajouter le block à la chaine
         my_block_chaine.ajouter_block(block_a_tester)
@@ -175,11 +203,11 @@ def receive_nonce(request):
         print("Ma chaine est de taille "+str(len(my_block_chaine)))
 
         # Reset le block courant
-        block_courant = Block(0 , [])
+        block_courant.reset()
     else :
         print("------------ Nonce invalide")
         # Reset le block courant
-        block_courant = block_attente
+        block_courant.reset()
 
     thread_recherche_hash = threading.Thread(target=rechercher_hash)
     thread_recherche_hash.start()
@@ -187,19 +215,7 @@ def receive_nonce(request):
     return HttpResponse(status=200)
 
 def loop(request):
-    # while True:
-    #     print("J'envoie une transaction")
-    #     # Generate random transaction
-    #     tr = generate_transaction()
-    #     # Send the transaction to all the nodes in local network
-    #     for entry in clients:
-    #         try :
-    #             response = requests.get("http://127.0.0.1:"+entry+"/kd_coin/receive_transaction", json=tr)
-    #             # print(response)
-    #         except:
-    #             pass
-    #     # sleep for a random time
-    #     time.sleep(randint(5,7))
+
    #Lancer le thread qui envoie des transactions en permanence
     thread_envoie_transactions = threading.Thread(target=send_transactions)
     thread_envoie_transactions.start() 
@@ -228,29 +244,34 @@ def send_transactions():
         time.sleep(randint(1, 4))
 
 def rechercher_hash():
+    nonce = random()
+    le_hash = "1111111111"
+    global block_courant
+    global my_block_chaine
+    global my_stop
+    count = 0
+    my_stop = False
+    while not my_stop:
         nonce = random()
-        le_hash = "1111111111"
-        global block_courant
-        global my_block_chaine
-        global my_stop
-        count = 0
-        my_stop = False
-        while not my_stop:
-            nonce = random()
+        if len(block_courant.transactions) > 1:
             le_hash = hashlib.sha256(str(str(nonce**2) + str(block_courant)).encode()).hexdigest()
-            count += 1
-            if le_hash[:6] == '000000':
-                my_stop = True
-                print("J'ai trouve le bon nonce " + str(sys.argv[-1]) +" apres "+str(count)+" iterations")
-                print(block_courant)
-                broadcast_block(nonce , le_hash, block_courant)
-                # Ajouter le block courant à la chaine
+                
+        count += 1
+        if le_hash[:5] == '00000':
+            my_stop = True
+            print("J'ai trouve le bon nonce " + str(sys.argv[-1]) +" apres "+str(count)+" iterations")
+            print(block_courant)
+            broadcast_block(nonce , le_hash, block_courant)
+            
+            # Ajouter le block courant à la chaine
+            if my_block_chaine.eval(block_courant):
                 my_block_chaine.ajouter_block(block_courant)
                 print("Ma chaine est de taille "+str(len(my_block_chaine)))
-                # Reset le block courant
-                block_courant = Block(0 , [])
-                # Reset les variables
-                count = 0
+            else:
+                print("Block non valide")
+            # Reset le block courant
+            block_courant.reset()
+            # Reset les variables
+            count = 0
+            
 
-# if __name__ != "__main__":
-#     print("hello")
