@@ -150,7 +150,7 @@ def test(request):
     return JsonResponse({'transaction':response})
 
 def receive_transaction(request):
-    print("Je recois une transaction de " + str(sys.argv[-1]))
+    print("Je recois une transaction je suis " + str(sys.argv[-1]))
     # # Get the port i am using
     # print(sys.argv[-1])
     # Get the data  from the GET request and cast it to a dict from json
@@ -230,7 +230,7 @@ def send_transactions():
     while True:
         time.sleep(randint(1, 4))
         
-        print("J'envoie une transaction a " + str(sys.argv[-1]))
+        print("J'envoie une transaction, je suis  " + str(sys.argv[-1]))
         # Generate random transaction
         tr = generate_transaction()
         # Send the transaction to all the nodes in local network
