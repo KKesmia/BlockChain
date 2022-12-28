@@ -108,27 +108,39 @@ class Block_chaine:
         return(len(self.liste_blocks))
 
 # Init the variables
+difficulté = 5
+nonce_head = "0" * difficulté
 
 clients = ['8080', '8090', '8100']
-clients_ = ['8080', '8090'] 
+clients_ = ['8080', '8090', '8100'] 
 clients_.remove(sys.argv[-1])
 liste_transactions = []
 global block_courant 
-block_courant = Block(0, [])
-block_courant.reset()
 global my_block_chaine
 global my_stop
+
+block_courant = Block(0, [])
+block_courant.reset()
 my_block_chaine = Block_chaine()
 # Ajouter le premier block
 premier_block = Block(0 , [])
-for act in clients[:2]:
+
+# 
+for act in clients:
     liste_transactions.append(Transaction(act, act, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 100))
 premier_block.transactions = liste_transactions
 my_block_chaine.liste_blocks.append(premier_block)
 my_block_chaine.eval(None)
 
-def index(request):
-    return JsonResponse({'foo':'bar'})
+def index (request):
+    data ={'id_acteur': sys.argv[-1],
+            'transactions': block_courant.transactions,}
+    return render(request, 'kd_coin/index.html', data)
+
+def return_block_chain(request):
+    data ={'id_acteur': sys.argv[-1],
+            'transactions': block_courant.transactions,}
+    return render(request, 'kd_coin/index.html', data)
 
 def generate_transaction():
     # Generate random transaction
@@ -179,7 +191,7 @@ def receive_nonce(request):
     global my_block_chaine
     global my_stop
     my_stop = True # arreter le thread de recherche de nonce
-    print("Je recois un nonce " + str(sys.argv[-1]))
+    print("Je recois un nonce je suis " + str(sys.argv[-1]))
     
     # Get the data  from the GET request and cast it to a dict from json
     response = json.loads(request.body)
@@ -257,7 +269,7 @@ def rechercher_hash():
             le_hash = hashlib.sha256(str(str(nonce**2) + str(block_courant)).encode()).hexdigest()
                 
         count += 1
-        if le_hash[:5] == '00000':
+        if le_hash[:difficulté] == nonce_head:
             my_stop = True
             print("J'ai trouve le bon nonce " + str(sys.argv[-1]) +" apres "+str(count)+" iterations")
             print(block_courant)
