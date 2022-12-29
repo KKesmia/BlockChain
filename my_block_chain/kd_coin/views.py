@@ -97,6 +97,7 @@ class Block_chaine:
 
     def ajouter_block(self, block):
         block.id = self.liste_blocks[-1].id + 1
+        print("previous block id", self.liste_blocks[-1].id, "new block id", block.id)
         self.liste_blocks.append(block)
 
     def __str__(self):
@@ -285,7 +286,8 @@ def rechercher_hash():
             else:
                 print("Block non valide")
             # Reset le block courant
-            block_courant.reset()
+            block_courant = Block(0, [])
+
             # Reset les variables
             count = 0
             
