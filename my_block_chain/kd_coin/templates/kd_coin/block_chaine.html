@@ -1,0 +1,8 @@
+<h1>Acteur {{ id_acteur }}</h1>
+<h2>Voici la liste blocks dans la block chaine:</h2>
+{% for block in liste_block %}
+    <p>Block :{{block.id}}</p>
+    {% for tr in block.transactions %}
+    <p style="text-indent:40px" >{{ tr }}</p>
+    {% endfor %}
+{% endfor %}

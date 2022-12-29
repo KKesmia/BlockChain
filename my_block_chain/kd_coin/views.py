@@ -133,14 +133,17 @@ my_block_chaine.liste_blocks.append(premier_block)
 my_block_chaine.eval(None)
 
 def index (request):
-    data ={'id_acteur': sys.argv[-1],
-            'transactions': block_courant.transactions,}
-    return render(request, 'kd_coin/index.html', data)
+    return render(request, 'kd_coin/index.html')
 
-def return_block_chain(request):
+def return_block_courant(request):
     data ={'id_acteur': sys.argv[-1],
-            'transactions': block_courant.transactions,}
-    return render(request, 'kd_coin/index.html', data)
+           'transactions': block_courant.transactions,}
+    return render(request, 'kd_coin/block_courant.html', data)
+
+def return_block_chaine(request):
+    data ={'id_acteur': sys.argv[-1],
+           'liste_block': my_block_chaine.liste_blocks,}
+    return render(request, 'kd_coin/block_chaine.html', data)
 
 def generate_transaction():
     # Generate random transaction
